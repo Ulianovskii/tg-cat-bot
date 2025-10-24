@@ -4,8 +4,6 @@ import logging
 import random
 import os
 from dotenv import load_dotenv
-import json
-import base64
 
 # Загружаем .env
 load_dotenv()
@@ -171,4 +169,13 @@ class CatAnalyzer:
             logger.error(f"Request failed: {e}")
             return None
 
+# Создаем экземпляр анализатора
 cat_analyzer = CatAnalyzer()
+
+# Функция для совместимости с вашим photo_handler.py
+async def analyze_cat_image(image_data: bytes) -> str:
+    """
+    Асинхронная функция для анализа изображения
+    Используется в photo_handler.py
+    """
+    return await cat_analyzer.analyze_cat_image(image_data)

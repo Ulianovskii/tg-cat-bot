@@ -16,6 +16,12 @@ print("✅ Bot instance loaded")
 import app.handlers.basic
 print("✅ Basic handlers loaded")
 
+from app.handlers.photo_handler import router as photo_router
+
+# ⚠️ ДОБАВЬТЕ ЭТУ СТРОЧКУ - подключение роутера для фото
+dp.include_router(photo_router)
+print("✅ Photo handler loaded")
+
 from app.db.models import Base
 from app.db.database import engine
 

@@ -8,6 +8,7 @@ from app.db.database import SessionLocal
 from app.db.models import UserLimit
 from datetime import date
 import logging
+from app.services.openai_analyzer import analyze_cat_image
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,8 @@ async def analyze_current_photo(message: Message):
         logger.info(f"✅ Photo downloaded for analysis, size: {len(photo_bytes.getvalue())} bytes")
         
         # Анализируем через нейросеть
-        analysis_result = await cat_analyzer.analyze_cat_image(photo_bytes.getvalue())
+        from app.services.openai_analyzer import analyze_cat_image
+        analysis_result = await analyze_cat_image(photo_bytes.getvalue())
         
         # Обновляем счетчик запросов
         with SessionLocal() as db:
@@ -163,6 +165,8 @@ async def back_to_menu(message: Message):
 @cat_router.message(F.text == "Оценить котика")
 async def start_cat_rating(message: Message):
     """Начало процесса оценки котика"""
+    user_id = message.from_user.id  # ← ДОБАВЬ ЭТУ СТРОЧКУ!
+    
     await message.answer(
         "📸 Отправь фото котика для оценки!",
         reply_markup=ReplyKeyboardRemove()

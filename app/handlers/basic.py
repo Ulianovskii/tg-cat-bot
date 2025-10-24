@@ -1,5 +1,3 @@
-# app/handlers/basic.py
-
 from aiogram import types, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
@@ -10,7 +8,7 @@ import random
 from app.bot_instance import dp
 from app.db.database import SessionLocal
 from app.db.models import UserLimit
-from app.services.cat_analyzer import cat_analyzer
+from app.services.openai_analyzer import analyze_cat_image
 
 MAX_REQUESTS = 10
 logger = logging.getLogger(__name__)
@@ -177,7 +175,7 @@ async def analyze_photo_directly(message: Message):
         logger.info(f"✅ Photo downloaded for analysis, size: {len(photo_bytes.getvalue())} bytes")
         
         # Анализируем
-        analysis_result = await cat_analyzer.analyze_cat_image(photo_bytes.getvalue())
+        analysis_result = await analyze_cat_image(photo_bytes.getvalue())
         
         # Списываем запрос
         with SessionLocal() as db:

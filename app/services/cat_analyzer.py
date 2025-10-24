@@ -26,12 +26,10 @@ class CatAnalyzer:
             
             # Породы собак (для фильтрации)
             'dog': 'собака', 'puppy': 'щенок', 'terrier': 'терьер',
-            'american staffordshire terrier': 'американский стаффордширский терьер',
-            'staffordshire terrier': 'стаффордширский терьер', 
-            'american pit bull terrier': 'американский питбультерьер',
-            'pit bull terrier': 'питбультерьер',
-            'labrador': 'лабрадор', 'german shepherd': 'немецкая овчарка',
-            'golden retriever': 'золотистый ретривер', 'poodle': 'пудель',
+            'american': 'американский', 'staffordshire': 'стаффордширский',
+            'pit': 'питбуль', 'bull': 'буль',
+            'labrador': 'лабрадор', 'german': 'немецкий', 'shepherd': 'овчарка',
+            'golden': 'золотистый', 'retriever': 'ретривер', 'poodle': 'пудель',
             
             # Общие термины
             'animal': 'животное', 'pet': 'питомец', 'domestic': 'домашний',

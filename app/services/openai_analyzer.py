@@ -1,3 +1,4 @@
+# app/services/openai_analyzer.py
 from openai import AsyncOpenAI
 import base64
 import logging
@@ -40,6 +41,10 @@ class OpenAICatAnalyzer:
         print(f"🔑 OPENAI_API_KEY from env: '{self.api_key}'")
         print(f"🔑 Key length: {len(self.api_key) if self.api_key else 0}")
         
+        # ✅ Загружаем промпт из файла
+        self.prompt_text = self._load_prompt()
+        print(f"📝 Prompt loaded: {len(self.prompt_text)} chars")
+        
         # ✅ Создаем клиент
         if self.api_key:
             try:
@@ -54,6 +59,30 @@ class OpenAICatAnalyzer:
         
         print("=== END DEBUG ===")
     
+    def _load_prompt(self):
+        """Загружает промпт из файла"""
+        try:
+            prompt_path = os.path.join(
+                os.path.dirname(__file__), 
+                '..', 
+                'prompts', 
+                'cat_prompt.txt'
+            )
+            print(f"📁 Loading prompt from: {prompt_path}")
+            
+            if os.path.exists(prompt_path):
+                with open(prompt_path, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    print(f"✅ Prompt loaded successfully: {len(content)} chars")
+                    return content
+            else:
+                print("❌ Prompt file not found, using default")
+                return "Опиши этого котика на русском смешно и забавно! 2-3 предложения."
+                
+        except Exception as e:
+            print(f"❌ Error loading prompt: {e}")
+            return "Опиши этого котика на русском смешно и забавно! 2-3 предложения."
+    
     async def analyze_cat_image(self, image_data: bytes) -> str:
         if not self.client:
             return "❌ OpenAI API не настроен"
@@ -61,6 +90,7 @@ class OpenAICatAnalyzer:
         try:
             logger.info("🔍 Анализируем котика через GPT-4o Mini...")
             print("🔄 Sending request to OpenAI...")
+            print(f"📝 Using prompt: {self.prompt_text[:100]}...")  # Покажем начало промпта
             
             # Кодируем изображение
             image_base64 = base64.b64encode(image_data).decode('utf-8')
@@ -74,7 +104,7 @@ class OpenAICatAnalyzer:
                         "content": [
                             {
                                 "type": "text", 
-                                "text": "Опиши этого котика на русском смешно и забавно! 2-3 предложения про что он делает, его эмоции и обстановку. Будь оригинальным, используй русский юмор!"
+                                "text": self.prompt_text  # ← ИСПОЛЬЗУЕМ ПРОМПТ ИЗ ФАЙЛА
                             },
                             {
                                 "type": "image_url",

@@ -1,7 +1,9 @@
 # app/handlers/cat_rating.py
 from aiogram import F, Router
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from app.services.cat_analyzer import cat_analyzer
+from app.bot_instance import bot
 from app.db.database import SessionLocal
 from app.db.models import UserLimit
 from datetime import date
@@ -12,26 +14,31 @@ logger = logging.getLogger(__name__)
 cat_router = Router()
 MAX_REQUESTS = 10
 
+# Храним последние фото пользователей {user_id: file_id}
 user_last_photos = {}
 
-# Клавиатуры
-empty_rating_keyboard = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="Перейти в меню")]],
-    resize_keyboard=True
-)
-
+# Клавиатура после получения фото
 photo_received_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="Оценить этого котика")],
-        [KeyboardButton(text="Перейти в меню")]
+        [KeyboardButton(text="Оценить другого котика")]
     ],
     resize_keyboard=True
 )
 
-# ДИАГНОСТИКА: Простой обработчик фото
+# Главное меню
+main_menu_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Оценить котика")],
+        [KeyboardButton(text="Мой профиль")],
+        [KeyboardButton(text="Помощь")]
+    ],
+    resize_keyboard=True
+)
+
 @cat_router.message(F.photo)
-async def handle_photo(message: Message):
-    """Обработка загруженного фото"""
+async def handle_cat_photo(message: Message):
+    """Обработчик загрузки фото котика"""
     user_id = message.from_user.id
     logger.info(f"✅ Photo received from user {user_id}")
     
@@ -41,59 +48,62 @@ async def handle_photo(message: Message):
         user_last_photos[user_id] = photo.file_id
         
         await message.answer(
-            "✅ Фото получено! Нажми 'Оценить этого котика' для анализа 🐱",
+            "✅ Фото получено! Что хотите сделать?",
             reply_markup=photo_received_keyboard
         )
-        logger.info(f"✅ Photo saved for user {user_id}, keyboard sent")
+        logger.info(f"✅ Photo saved for user {user_id}")
+        
     except Exception as e:
         logger.error(f"❌ Error saving photo: {e}")
-        await message.answer("Ой! Не удалось сохранить фото. Попробуй еще раз! 😿", reply_markup=empty_rating_keyboard)
+        await message.answer("😿 Не удалось сохранить фото. Попробуй еще раз!", reply_markup=main_menu_keyboard)
 
 @cat_router.message(F.text == "Оценить этого котика")
-async def analyze_photo(message: Message):
-    """Анализ сохраненного фото"""
+async def analyze_current_photo(message: Message):
+    """Анализ текущего сохраненного фото через нейросеть"""
     user_id = message.from_user.id
     today = date.today()
     
-    logger.info(f"🔍 Analyze photo button pressed by user {user_id}")
+    logger.info(f"🔍 Analyze current photo by user {user_id}")
     
     # Проверяем есть ли фото
     if user_id not in user_last_photos:
-        await message.answer("Сначала загрузи фото котика! 📸", reply_markup=empty_rating_keyboard)
+        await message.answer("📸 Сначала загрузи фото котика!", reply_markup=main_menu_keyboard)
         return
     
-    # Проверяем лимит
+    # Проверяем лимит запросов
     with SessionLocal() as db:
         user = db.query(UserLimit).filter(UserLimit.user_id == user_id).first()
         
         if not user:
-            await message.answer("Сначала активируй лимит в главном меню!", reply_markup=empty_rating_keyboard)
+            await message.answer("❌ Сначала активируй лимит в главном меню!", reply_markup=main_menu_keyboard)
             return
         
+        # Сбрасываем лимит если новый день
         if user.last_reset < today:
             user.used_requests = 0
             user.last_reset = today
             db.commit()
         
+        # Проверяем не превышен ли лимит
         if user.used_requests >= MAX_REQUESTS:
-            await message.answer("Бесплатные запросы закончились! Приходи завтра! 🐾", reply_markup=empty_rating_keyboard)
+            await message.answer("😿 Бесплатные запросы закончились! Приходи завтра! 🐾", reply_markup=main_menu_keyboard)
             return
     
     try:
-        processing_msg = await message.answer("Анализирую котика... 🔍")
+        # Сообщение о начале анализа
+        processing_msg = await message.answer("🔍 Нейросеть анализирует котика...")
         
         # Получаем сохраненное фото
         file_id = user_last_photos[user_id]
-        from app.bot_instance import bot
         file = await bot.get_file(file_id)
         photo_bytes = await bot.download_file(file.file_path)
         
         logger.info(f"✅ Photo downloaded for analysis, size: {len(photo_bytes.getvalue())} bytes")
         
-        # Анализируем
+        # Анализируем через нейросеть
         analysis_result = await cat_analyzer.analyze_cat_image(photo_bytes.getvalue())
         
-        # Списываем запрос
+        # Обновляем счетчик запросов
         with SessionLocal() as db:
             user = db.query(UserLimit).filter(UserLimit.user_id == user_id).first()
             if user:
@@ -101,33 +111,60 @@ async def analyze_photo(message: Message):
                 db.commit()
                 remaining = MAX_REQUESTS - user.used_requests
         
-        # Удаляем фото
+        # Удаляем сообщение "анализируем"
+        await processing_msg.delete()
+        
+        # Отправляем результат от нейросети
+        await message.answer(
+            f"😸 {analysis_result}\n\n📊 Осталось запросов: {remaining}",
+            reply_markup=main_menu_keyboard
+        )
+        
+        # Очищаем сохраненное фото
         del user_last_photos[user_id]
         
-        await processing_msg.delete()
-        await message.answer(
-            f"{analysis_result}\n\n📊 Осталось запросов: {remaining}",
-            reply_markup=empty_rating_keyboard
-        )
         logger.info(f"✅ Photo analyzed successfully for user {user_id}")
         
     except Exception as e:
         logger.error(f"❌ Error analyzing photo: {e}")
-        await message.answer("Ой! Не удалось проанализировать фото. Попробуй еще раз! 😿", reply_markup=empty_rating_keyboard)
+        await message.answer("😿 Не удалось проанализировать фото. Попробуй еще раз!", reply_markup=main_menu_keyboard)
+
+@cat_router.message(F.text == "Оценить другого котика")
+async def analyze_different_photo(message: Message):
+    """Запрос нового фото котика"""
+    user_id = message.from_user.id
+    
+    # Очищаем предыдущее фото
+    if user_id in user_last_photos:
+        del user_last_photos[user_id]
+    
+    await message.answer(
+        "📸 Отправь фото нового котика для оценки!",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    logger.info(f"🔄 User {user_id} requested new photo")
 
 @cat_router.message(F.text == "Перейти в меню")
 async def back_to_menu(message: Message):
     """Возврат в главное меню"""
     user_id = message.from_user.id
+    
+    # Очищаем сохраненное фото
     if user_id in user_last_photos:
         del user_last_photos[user_id]
     
-    await message.answer("Возвращаемся в меню!", reply_markup=ReplyKeyboardRemove())
-    from app.handlers.basic import MAIN_MENU_KEYBOARD
-    await message.answer("Выбери действие:", reply_markup=MAIN_MENU_KEYBOARD)
+    await message.answer(
+        "🏠 Возвращаемся в главное меню!",
+        reply_markup=main_menu_keyboard
+    )
+    logger.info(f"🏠 User {user_id} returned to main menu")
 
-# ДИАГНОСТИКА: Обработчик всех сообщений в роутере
-@cat_router.message()
-async def debug_all_messages(message: Message):
-    """Диагностический обработчик всех сообщений в роутере"""
-    logger.info(f"DEBUG: Message in cat_router: '{message.text}' from user {message.from_user.id}")
+# Обработчик для главного меню "Оценить котика"
+@cat_router.message(F.text == "Оценить котика")
+async def start_cat_rating(message: Message):
+    """Начало процесса оценки котика"""
+    await message.answer(
+        "📸 Отправь фото котика для оценки!",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    logger.info(f"📸 User {user_id} started cat rating process")

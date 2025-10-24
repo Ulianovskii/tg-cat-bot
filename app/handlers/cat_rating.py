@@ -6,7 +6,7 @@ from app.db.database import SessionLocal
 from app.db.models import UserLimit
 from datetime import date
 import logging
-from app.services.openai_analyzer import analyze_cat_image  # ← ТОЛЬКО ЭТОТ ИМПОРТ!
+from app.services.openai_analyzer import analyze_cat_image
 
 logger = logging.getLogger(__name__)
 

@@ -1,84 +1,31 @@
-# app/db/database.py
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from app.config import DATABASE_URL
+# app/db/models.py
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date
+from app.db.database import Base
 import datetime
 
-# sqlite: special arg
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    tg_id = Column(String, unique=True, index=True)
+    is_premium = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # ⬇️ ПОЛЯ ДЛЯ ЗАПРОСОВ
+    free_requests = Column(Integer, default=10)
+    paid_requests = Column(Integer, default=0)
+    last_reset = Column(Date, default=datetime.date.today)
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+class Watch(Base):
+    __tablename__ = "watches"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    origin = Column(String)
+    destination = Column(String)
+    price_limit = Column(Integer)
+    active = Column(Boolean, default=True)
 
-# ⬇️⬇️⬇️ ОБНОВЛЕННЫЕ ФУНКЦИИ ДЛЯ НОВЫХ ПОЛЕЙ ⬇️⬇️⬇️
-
-def get_user(user_id: int):
-    """Получить пользователя по ID"""
-    from app.db.models import User
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            # Создаем нового пользователя если не существует
-            user = User(
-                id=user_id, 
-                tg_id=str(user_id),
-                free_requests=10, 
-                paid_requests=0,
-                last_reset=datetime.date.today()
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        else:
-            # Проверяем нужно ли сбросить бесплатные запросы
-            if user.last_reset < datetime.date.today():
-                user.free_requests = 10
-                user.last_reset = datetime.date.today()
-                db.commit()
-                db.refresh(user)
-                
-        return user
-    finally:
-        db.close()
-
-def update_user_balance(user_id: int, new_paid_balance: int):
-    """Обновить баланс оплаченных запросов"""
-    from app.db.models import User
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if user:
-            user.paid_requests = new_paid_balance
-            db.commit()
-    finally:
-        db.close()
-
-def use_free_request(user_id: int):
-    """Использовать один бесплатный запрос"""
-    from app.db.models import User
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if user and user.free_requests > 0:
-            user.free_requests -= 1
-            db.commit()
-            return True
-        return False
-    finally:
-        db.close()
-
-def use_paid_request(user_id: int):
-    """Использовать один оплаченный запрос"""
-    from app.db.models import User
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if user and user.paid_requests > 0:
-            user.paid_requests -= 1
-            db.commit()
-            return True
-        return False
-    finally:
-        db.close()
+class UserLimit(Base):
+    __tablename__ = "user_limits"
+    user_id = Column(Integer, primary_key=True)
+    last_reset = Column(Date, nullable=False)
+    used_requests = Column(Integer, default=0)

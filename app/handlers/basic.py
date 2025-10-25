@@ -1,18 +1,15 @@
-from aiogram import types, F
+# app/handlers/basic.py
+from aiogram import Router, types, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from datetime import date
 import logging
 import random
 
-from app.bot_instance import dp
-from app.db.database import SessionLocal
-from app.db.models import UserLimit
+from app.db.database import get_user, use_free_request, use_paid_request
 from app.services.openai_analyzer import analyze_cat_image
 
-from app.db.database import get_user, use_free_request, use_paid_request
+router = Router()  # ← ИСПОЛЬЗУЕМ ROUTER вместо dp
 
-MAX_REQUESTS = 10
 logger = logging.getLogger(__name__)
 
 # Храним последние фото пользователей
@@ -47,7 +44,7 @@ after_rating_keyboard = ReplyKeyboardMarkup(
 )
 
 # ----------------- Обработка команды /start -----------------
-@dp.message(CommandStart())
+@router.message(CommandStart())  # ← router вместо dp
 async def start_handler(message: Message):
     await message.answer(
         "Привет! Я твой бот эксперт по пушистостям 😊\n"
@@ -57,47 +54,45 @@ async def start_handler(message: Message):
 
 # ----------------- Callback обработчики -----------------
 
-@dp.callback_query(lambda c: c.data == "check_limit")
+@router.callback_query(lambda c: c.data == "check_limit")
 async def check_limit_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    
-    # Используем новую систему с User вместо UserLimit
     user = get_user(user_id)
     
     await callback.message.answer(
         f"📊 Ваш баланс:\n\n"
-        f"🆓 Бесплатных запросов: {user.free_requests}\n"
+        f"🆓 Бесплатных запросов: {user.free_requests}/5\n"  # ← ДОБАВЬТЕ /5
         f"⭐ Оплаченных запросов: {user.paid_requests}\n\n"
         f"💫 Бесплатные запросы обновляются каждый день!"
     )
     await callback.answer()
-
-@dp.callback_query(lambda c: c.data == "topup_limit")
+    
+@router.callback_query(lambda c: c.data == "topup_limit")
 async def topup_limit_handler(callback: types.CallbackQuery):
     """Показ меню пополнения через Stars"""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="3 ⭐ - 10 запросов", callback_data="buy_3"),
-                InlineKeyboardButton(text="10 ⭐ - 35 запросов", callback_data="buy_10"),
+                InlineKeyboardButton(text="15 ⭐ - 3 запроса", callback_data="buy_15"),
+                InlineKeyboardButton(text="45 ⭐ - 10 запросов", callback_data="buy_45"),
             ],
             [
-                InlineKeyboardButton(text="20 ⭐ - 100 запросов", callback_data="buy_20"),
+                InlineKeyboardButton(text="80 ⭐ - 20 запросов", callback_data="buy_80"),
             ]
         ]
     )
     
     await callback.message.answer(
         "🎯 Выберите пакет запросов:\n\n"
-        "💫 3 ⭐ = 10 запросов\n"
-        "✨ 10 ⭐ = 35 запросов\n" 
-        "🌟 20 ⭐ = 100 запросов\n\n"
+        "💫 15 ⭐ = 3 запроса\n"
+        "✨ 45 ⭐ = 10 запросов\n" 
+        "🌟 80 ⭐ = 20 запросов\n\n"
         "⭐ Stars покупаются прямо в Telegram",
         reply_markup=keyboard
     )
     await callback.answer()
 
-@dp.callback_query(lambda c: c.data == "rate_cat")
+@router.callback_query(lambda c: c.data == "rate_cat")  # ← router вместо dp
 async def rate_cat_handler(callback: types.CallbackQuery):
     await callback.message.answer(
         "Загрузи фото котика для оценки! 📸\n\n"
@@ -107,7 +102,7 @@ async def rate_cat_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 # ----------------- Обработка фото -----------------
-@dp.message(F.photo)
+@router.message(F.photo)  # ← router вместо dp
 async def handle_photo_directly(message: Message):
     """Обработчик загруженного фото"""
     user_id = message.from_user.id
@@ -127,7 +122,7 @@ async def handle_photo_directly(message: Message):
         await message.answer("Ой! Не удалось сохранить фото. Попробуй еще раз! 😿")
 
 # ----------------- Обработка кнопки "Оценить этого котика" -----------------
-@dp.message(F.text == "Оценить этого котика")
+@router.message(F.text == "Оценить этого котика")  # ← router вместо dp
 async def analyze_photo_directly(message: Message):
     """Анализ сохраненного фото"""
     user_id = message.from_user.id
@@ -193,7 +188,7 @@ async def analyze_photo_directly(message: Message):
         await message.answer("Ой! Не удалось проанализировать фото. Попробуй еще раз! 😿", reply_markup=photo_received_keyboard)
 
 # ----------------- Обработка кнопки "Оценить другого котика" -----------------
-@dp.message(F.text == "Оценить другого котика")
+@router.message(F.text == "Оценить другого котика")  # ← router вместо dp
 async def rate_another_cat_handler(message: Message):
     """Начать оценку другого котика"""
     user_id = message.from_user.id
@@ -224,7 +219,7 @@ async def rate_another_cat_handler(message: Message):
     )
 
 # ----------------- Обработка кнопки "Вернуться в меню" -----------------
-@dp.message(F.text == "Вернуться в меню")
+@router.message(F.text == "Вернуться в меню")  # ← router вместо dp
 async def back_to_menu_directly(message: Message):
     """Возврат в главное меню"""
     user_id = message.from_user.id
@@ -235,7 +230,7 @@ async def back_to_menu_directly(message: Message):
     await message.answer("Выбери действие:", reply_markup=MAIN_MENU_KEYBOARD)
 
 # ----------------- Обработка обычного текста -----------------
-@dp.message()
+@router.message()  # ← router вместо dp
 async def handle_user_request(message: Message):
     """Обработка случайного текста - не списываем запросы"""
     if message.text and not message.text.startswith('/'):

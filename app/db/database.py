@@ -20,7 +20,7 @@ def get_user(user_id: int):
             user = User(
                 id=user_id, 
                 tg_id=str(user_id),
-                free_requests=10, 
+                free_requests=5, 
                 paid_requests=0,
                 last_reset=datetime.date.today()
             )
@@ -29,7 +29,7 @@ def get_user(user_id: int):
             db.refresh(user)
         else:
             if user.last_reset < datetime.date.today():
-                user.free_requests = 10
+                user.free_requests = 5
                 user.last_reset = datetime.date.today()
                 db.commit()
                 db.refresh(user)
@@ -46,5 +46,33 @@ def update_user_balance(user_id: int, new_paid_balance: int):
         if user:
             user.paid_requests = new_paid_balance
             db.commit()
+    finally:
+        db.close()
+
+def use_free_request(user_id: int):
+    """Использовать один бесплатный запрос"""
+    from app.db.models import User
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.free_requests > 0:
+            user.free_requests -= 1
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()
+
+def use_paid_request(user_id: int):
+    """Использовать один оплаченный запрос"""
+    from app.db.models import User
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.paid_requests > 0:
+            user.paid_requests -= 1
+            db.commit()
+            return True
+        return False
     finally:
         db.close()

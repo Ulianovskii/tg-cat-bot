@@ -12,15 +12,16 @@ print("=== НАСТРОЙКА БОТА ===")
 from app.bot_instance import dp, bot
 print("✅ Bot instance loaded")
 
-# Импортируем только basic handlers (все обработчики теперь там)
-import app.handlers.basic
-print("✅ Basic handlers loaded")
-
+# Импортируем роутеры
+from app.handlers.payment_handler import payment_router
+from app.handlers.basic import router as basic_router
 from app.handlers.photo_handler import router as photo_router
 
-# ⚠️ ДОБАВЬТЕ ЭТУ СТРОЧКУ - подключение роутера для фото
+# Подключаем роутеры
+dp.include_router(payment_router)
+dp.include_router(basic_router)  
 dp.include_router(photo_router)
-print("✅ Photo handler loaded")
+print("✅ All routers loaded")
 
 from app.db.models import Base
 from app.db.database import engine
@@ -39,5 +40,5 @@ async def main():
     logging.info("Запуск бота...")
     await dp.start_polling(bot)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())

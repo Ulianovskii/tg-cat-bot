@@ -10,11 +10,11 @@ class User(Base):
     is_premium = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
-    # ⬇️ ПОЛЯ ДЛЯ ЗАПРОСОВ
+    # ⬇️⬇️⬇️ ДОБАВЬТЕ ЭТИ 3 СТРОЧКИ ⬇️⬇️⬇️
     free_requests = Column(Integer, default=10)
     paid_requests = Column(Integer, default=0)
     last_reset = Column(Date, default=datetime.date.today)
-
+    # ⬆️⬆️⬆️ КОНЕЦ ДОБАВЛЕНИЯ ⬆️⬆️⬆️
 class Watch(Base):
     __tablename__ = "watches"
     id = Column(Integer, primary_key=True, index=True)

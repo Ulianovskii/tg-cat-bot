@@ -5,8 +5,8 @@ from aiogram.filters import Command
 from app.db.database import get_user, update_user_balance
 import logging
 
-# ⬇️⬇️⬇️ ДОБАВЬТЕ ЭТУ СТРОКУ ⬇️⬇️⬇️
 payment_router = Router()
+
 logger = logging.getLogger(__name__)
 
 @payment_router.message(Command("replenish"))
@@ -34,17 +34,16 @@ async def replenish_balance(message: Message):
 async def handle_buy_callback(callback: CallbackQuery):
     """Создание инвойса с Stars"""
     packages = {
-        "buy_3": {"stars": 3, "requests": 10, "title": "3 звезды - 10 запросов"},
-        "buy_10": {"stars": 10, "requests": 35, "title": "10 звезд - 35 запросов"},
-        "buy_20": {"stars": 20, "requests": 100, "title": "20 звезд - 100 запросов"},
+        "buy_15": {"stars": 15, "requests": 3, "title": "15 звезд - 3 запроса"},
+        "buy_45": {"stars": 45, "requests": 10, "title": "45 звезд - 10 запросов"}, 
+        "buy_80": {"stars": 80, "requests": 20, "title": "80 звезд - 20 запросов"}
     }
     
     selected_package = packages[callback.data]
     
-    # ⬇️⬇️⬇️ ИСПРАВЬТЕ ЭТУ СТРОКУ - УБЕРИТЕ * 100 ⬇️⬇️⬇️
     prices = [LabeledPrice(
         label=selected_package['title'],
-        amount=selected_package['stars']  # ← БЕЗ * 100! 3 звезды = 3
+        amount=selected_package['stars']  # ← БЕЗ * 100 для правильного отображения
     )]
     
     await callback.bot.send_invoice(

@@ -1,44 +1,10 @@
-source venv/bin/activate
-# Заходим в Python
-python
-# Импортируем функцию
-from app.handlers.basic import reset_user_limit
-# Сбрасываем лимит для себя
-reset_user_limit(103181087)
+## 💫 Payment System
 
+The bot now supports Telegram Stars for purchasing additional requests:
 
-source venv/bin/activate && python -m app.main
+- 🆓 **5 free requests** per day
+- 💫 **15 Stars** = 3 additional requests  
+- ✨ **45 Stars** = 10 additional requests
+- 🌟 **80 Stars** = 20 additional requests
 
-Установите watchfiles для автоматического перезапуска:
-
-bash restart_bot.sh
-
-
-# 1. Проверить что изменилось
-git status
-
-# 2. Добавить изменения
-git add .                          # все файлы
-git add app/main.py               # конкретный файл
-
-# 3. Закоммитить с понятным сообщением
-git commit -m "feat: улучшено определение котиков"
-
-# 4. Запушить в свою ветку
-git push origin feature/cat-detection
-
-
-# 1. Проверить статус
-git status
-
-# 2. Если файл есть в "Untracked files" - добавить его
-git add app/handlers/payment_handler.py
-
-# 3. Проверить что файл добавлен в staged changes
-git status
-
-# 4. Закоммитить
-git commit -m "add: payment handler for Telegram Stars"
-
-# 5. Запушить
-git push origin main
+Stars can be purchased directly in Telegram!

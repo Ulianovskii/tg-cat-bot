@@ -1,0 +1,5 @@
+# pyproject.toml
+[project]
+name = "tg-cat-bot"
+version = "1.1.0"
+description = "Telegram bot for analyzing cat photos with AI and Telegram Stars payments"

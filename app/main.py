@@ -19,7 +19,7 @@ from app.handlers.photo_handler import router as photo_router
 
 # Подключаем роутеры
 dp.include_router(payment_router)
-dp.include_router(basic_router)  
+dp.include_router(basic_router)
 dp.include_router(photo_router)
 print("✅ All routers loaded")
 

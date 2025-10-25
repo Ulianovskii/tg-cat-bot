@@ -6,8 +6,8 @@ from app.db.database import get_user, update_user_balance
 import logging
 
 payment_router = Router()
-
 logger = logging.getLogger(__name__)
+
 
 @payment_router.message(Command("replenish"))
 async def replenish_balance(message: Message):

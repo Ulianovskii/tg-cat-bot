@@ -10,6 +10,8 @@ from app.db.database import SessionLocal
 from app.db.models import UserLimit
 from app.services.openai_analyzer import analyze_cat_image
 
+from app.db.database import get_user, use_free_request, use_paid_request
+
 MAX_REQUESTS = 10
 logger = logging.getLogger(__name__)
 
@@ -58,28 +60,40 @@ async def start_handler(message: Message):
 @dp.callback_query(lambda c: c.data == "check_limit")
 async def check_limit_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    today = date.today()
-
-    with SessionLocal() as db:
-        user = db.query(UserLimit).filter(UserLimit.user_id == user_id).first()
-
-        if not user:
-            remaining = MAX_REQUESTS
-        else:
-            if user.last_reset < today:
-                user.used_requests = 0
-                user.last_reset = today
-                db.commit()
-            remaining = MAX_REQUESTS - user.used_requests
-
-        await callback.message.answer(f"У тебя осталось {remaining} бесплатных запросов!")
+    
+    # Используем новую систему с User вместо UserLimit
+    user = get_user(user_id)
+    
+    await callback.message.answer(
+        f"📊 Ваш баланс:\n\n"
+        f"🆓 Бесплатных запросов: {user.free_requests}\n"
+        f"⭐ Оплаченных запросов: {user.paid_requests}\n\n"
+        f"💫 Бесплатные запросы обновляются каждый день!"
+    )
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "topup_limit")
 async def topup_limit_handler(callback: types.CallbackQuery):
+    """Показ меню пополнения через Stars"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="3 ⭐ - 10 запросов", callback_data="buy_3"),
+                InlineKeyboardButton(text="10 ⭐ - 35 запросов", callback_data="buy_10"),
+            ],
+            [
+                InlineKeyboardButton(text="20 ⭐ - 100 запросов", callback_data="buy_20"),
+            ]
+        ]
+    )
+    
     await callback.message.answer(
-        "Пополните баланс на 10 запросов\n\n"
-        "Отправьте сообщение 'cat lover' чтобы сбросить лимит"
+        "🎯 Выберите пакет запросов:\n\n"
+        "💫 3 ⭐ = 10 запросов\n"
+        "✨ 10 ⭐ = 35 запросов\n" 
+        "🌟 20 ⭐ = 100 запросов\n\n"
+        "⭐ Stars покупаются прямо в Telegram",
+        reply_markup=keyboard
     )
     await callback.answer()
 
@@ -91,26 +105,6 @@ async def rate_cat_handler(callback: types.CallbackQuery):
         reply_markup=ReplyKeyboardRemove()
     )
     await callback.answer()
-
-# ----------------- Обработка сообщения "cat lover" -----------------
-@dp.message(lambda message: message.text and message.text.lower() == "cat lover")
-async def reset_limit_handler(message: Message):
-    user_id = message.from_user.id
-    today = date.today()
-
-    with SessionLocal() as db:
-        user = db.query(UserLimit).filter(UserLimit.user_id == user_id).first()
-        
-        if not user:
-            user = UserLimit(user_id=user_id, last_reset=today, used_requests=0)
-            db.add(user)
-        else:
-            user.used_requests = 0
-            user.last_reset = today
-        
-        db.commit()
-
-    await message.answer("✅ Лимит сброшен! У тебя снова 10 бесплатных запросов!")
 
 # ----------------- Обработка фото -----------------
 @dp.message(F.photo)
@@ -137,7 +131,6 @@ async def handle_photo_directly(message: Message):
 async def analyze_photo_directly(message: Message):
     """Анализ сохраненного фото"""
     user_id = message.from_user.id
-    today = date.today()
     
     logger.info(f"🔍 Analyze photo button pressed by user {user_id}")
     
@@ -146,22 +139,16 @@ async def analyze_photo_directly(message: Message):
         await message.answer("Сначала загрузи фото котика! 📸")
         return
     
-    # Проверяем лимит
-    with SessionLocal() as db:
-        user = db.query(UserLimit).filter(UserLimit.user_id == user_id).first()
-        
-        if not user:
-            await message.answer("Сначала активируй лимит в главном меню!")
-            return
-        
-        if user.last_reset < today:
-            user.used_requests = 0
-            user.last_reset = today
-            db.commit()
-        
-        if user.used_requests >= MAX_REQUESTS:
-            await message.answer("Бесплатные запросы закончились! Приходи завтра! 🐾")
-            return
+    # Проверяем баланс через новую систему
+    user = get_user(user_id)
+    
+    if user.free_requests <= 0 and user.paid_requests <= 0:
+        await message.answer(
+            "❌ У вас закончились запросы!\n\n"
+            "💫 Бесплатные запросы обновятся завтра\n"
+            "⭐ Или пополните баланс через меню"
+        )
+        return
     
     try:
         processing_msg = await message.answer("Анализирую котика... 🔍")
@@ -177,20 +164,26 @@ async def analyze_photo_directly(message: Message):
         # Анализируем
         analysis_result = await analyze_cat_image(photo_bytes.getvalue())
         
-        # Списываем запрос
-        with SessionLocal() as db:
-            user = db.query(UserLimit).filter(UserLimit.user_id == user_id).first()
-            if user:
-                user.used_requests += 1
-                db.commit()
-                remaining = MAX_REQUESTS - user.used_requests
+        # Списываем запрос (сначала бесплатные, потом платные)
+        if user.free_requests > 0:
+            use_free_request(user_id)
+            request_type = "бесплатный"
+        else:
+            use_paid_request(user_id) 
+            request_type = "оплаченный"
+        
+        # Получаем обновленный баланс
+        user = get_user(user_id)
         
         # Удаляем фото
         del user_last_photos[user_id]
         
         await processing_msg.delete()
         await message.answer(
-            f"{analysis_result}\n\n📊 Осталось запросов: {remaining}",
+            f"{analysis_result}\n\n"
+            f"📊 Использован {request_type} запрос\n"
+            f"🆓 Осталось бесплатных: {user.free_requests}\n"
+            f"⭐ Осталось оплаченных: {user.paid_requests}",
             reply_markup=after_rating_keyboard
         )
         logger.info(f"✅ Photo analyzed successfully for user {user_id}")
@@ -204,28 +197,21 @@ async def analyze_photo_directly(message: Message):
 async def rate_another_cat_handler(message: Message):
     """Начать оценку другого котика"""
     user_id = message.from_user.id
-    today = date.today()
     
     logger.info(f"🔄 User {user_id} wants to rate another cat")
     
-    # Проверяем лимит
-    with SessionLocal() as db:
-        user = db.query(UserLimit).filter(UserLimit.user_id == user_id).first()
-        
-        if not user:
-            await message.answer("Сначала активируй лимит в главном меню!", reply_markup=ReplyKeyboardRemove())
-            await message.answer("Выбери действие:", reply_markup=MAIN_MENU_KEYBOARD)
-            return
-        
-        if user.last_reset < today:
-            user.used_requests = 0
-            user.last_reset = today
-            db.commit()
-        
-        if user.used_requests >= MAX_REQUESTS:
-            await message.answer("Бесплатные запросы закончились! Приходи завтра! 🐾", reply_markup=ReplyKeyboardRemove())
-            await message.answer("Выбери действие:", reply_markup=MAIN_MENU_KEYBOARD)
-            return
+    # Проверяем баланс через новую систему
+    user = get_user(user_id)
+    
+    if user.free_requests <= 0 and user.paid_requests <= 0:
+        await message.answer(
+            "❌ У вас закончились запросы!\n\n"
+            "💫 Бесплатные запросы обновятся завтра\n"
+            "⭐ Или пополните баланс через меню",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        await message.answer("Выбери действие:", reply_markup=MAIN_MENU_KEYBOARD)
+        return
     
     # Очищаем старое фото если есть
     if user_id in user_last_photos:
@@ -262,10 +248,3 @@ async def handle_user_request(message: Message):
         ]
         response = random.choice(responses)
         await message.answer(response)
-
-# ----------------- Диагностический обработчик -----------------
-@dp.callback_query()
-async def debug_callback_handler(callback: types.CallbackQuery):
-    """Диагностический обработчик всех callback"""
-    print(f"DEBUG: Callback received: {callback.data}")
-    await callback.answer(f"Callback: {callback.data}")

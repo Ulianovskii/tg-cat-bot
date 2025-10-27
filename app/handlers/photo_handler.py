@@ -1,11 +1,10 @@
 from aiogram import types
 from aiogram.dispatcher.router import Router
 from app.bot_instance import bot
-from app.services.cat_analyzer import analyze_cat_image
 import logging
 
 logger = logging.getLogger(__name__)
-router = Router()  # ← ДОБАВЬТЕ ЭТУ СТРОЧКУ!
+router = Router()  
 
 @router.message(lambda message: message.photo is not None)
 async def handle_cat_photo(message: types.Message):

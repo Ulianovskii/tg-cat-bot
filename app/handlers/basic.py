@@ -230,7 +230,7 @@ async def back_to_menu_directly(message: Message):
     await message.answer("Выбери действие:", reply_markup=MAIN_MENU_KEYBOARD)
 
 # ----------------- Обработка обычного текста -----------------
-@router.message()  # ← router вместо dp
+@router.message()  
 async def handle_user_request(message: Message):
     """Обработка случайного текста - не списываем запросы"""
     if message.text and not message.text.startswith('/'):

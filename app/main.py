@@ -15,46 +15,37 @@ try:
     print("✅ Database migration completed")
 except Exception as e:
     print(f"⚠️ Migration warning: {e}")
-    # Продолжаем работу даже если миграция не удалась
 
-from app.bot_instance import dp, bot
+# Импортируем bot и dp
+from app.bot_instance import bot, dp
 print("✅ Bot instance loaded")
 
-# Импортируем роутеры
-from app.handlers.payment_handler import payment_router
+# Импортируем ВСЕ роутеры
 from app.handlers.basic import router as basic_router
-from app.handlers.photo_handler import router as photo_router
+from app.handlers.payment_handler import payment_router
 from app.handlers.admin_handler import admin_router
 
-# Подключаем роутеры
-dp.include_router(payment_router)
-dp.include_router(basic_router)
-dp.include_router(photo_router)
-dp.include_router(admin_router)
+# Подключаем роутеры в правильном порядке
+dp.include_router(basic_router)    # Основные команды и обработка текста
+dp.include_router(payment_router)  # Платежи
+dp.include_router(admin_router)    # Админка
 print("✅ All routers loaded")
 
 from app.db.models import Base
 from app.db.database import engine
 
-# Создаем только НОВЫЕ таблицы (не пересоздаем users)
+# Создаем только НОВЫЕ таблицы
 try:
     Base.metadata.create_all(bind=engine)
 except:
-    pass  # Таблицы уже существуют
+    pass
 
 print("=== ЗАПУСК БОТА ===")
-
-
-print("=== НАСТРОЙКА БОТА ===")
 
 # ПРОВЕРКА КОНФИГА
 from app.config import RequestConfig
 print("✅ Config loaded")
 print(f"PRICING: {RequestConfig.PRICING}")
-print(f"CONFIG FILE: {__file__}")
-
-from app.bot_instance import dp, bot
-print("✅ Bot instance loaded")
 
 async def main():
     logging.info("Запуск бота...")

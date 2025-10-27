@@ -4,12 +4,10 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 import logging
 import random
-
 from app.db.database import get_user, use_free_request, use_paid_request
 from app.services.openai_analyzer import analyze_cat_image
 
-router = Router()  # ← ИСПОЛЬЗУЕМ ROUTER вместо dp
-
+router = Router()
 logger = logging.getLogger(__name__)
 
 # Храним последние фото пользователей
@@ -44,7 +42,7 @@ after_rating_keyboard = ReplyKeyboardMarkup(
 )
 
 # ----------------- Обработка команды /start -----------------
-@router.message(CommandStart())  # ← router вместо dp
+@router.message(CommandStart())
 async def start_handler(message: Message):
     await message.answer(
         "Привет! Я твой бот эксперт по пушистостям 😊\n"
@@ -61,7 +59,7 @@ async def check_limit_handler(callback: types.CallbackQuery):
     
     await callback.message.answer(
         f"📊 Ваш баланс:\n\n"
-        f"🆓 Бесплатных запросов: {user.free_requests}/5\n"  # ← ДОБАВЬТЕ /5
+        f"🆓 Бесплатных запросов: {user.free_requests}/5\n"
         f"⭐ Оплаченных запросов: {user.paid_requests}\n\n"
         f"💫 Бесплатные запросы обновляются каждый день!"
     )
@@ -92,7 +90,7 @@ async def topup_limit_handler(callback: types.CallbackQuery):
     )
     await callback.answer()
 
-@router.callback_query(lambda c: c.data == "rate_cat")  # ← router вместо dp
+@router.callback_query(lambda c: c.data == "rate_cat")
 async def rate_cat_handler(callback: types.CallbackQuery):
     await callback.message.answer(
         "Загрузи фото котика для оценки! 📸\n\n"
@@ -102,7 +100,7 @@ async def rate_cat_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 # ----------------- Обработка фото -----------------
-@router.message(F.photo)  # ← router вместо dp
+@router.message(F.photo)
 async def handle_photo_directly(message: Message):
     """Обработчик загруженного фото"""
     user_id = message.from_user.id
@@ -122,7 +120,7 @@ async def handle_photo_directly(message: Message):
         await message.answer("Ой! Не удалось сохранить фото. Попробуй еще раз! 😿")
 
 # ----------------- Обработка кнопки "Оценить этого котика" -----------------
-@router.message(F.text == "Оценить этого котика")  # ← router вместо dp
+@router.message(F.text == "Оценить этого котика")
 async def analyze_photo_directly(message: Message):
     """Анализ сохраненного фото"""
     user_id = message.from_user.id
@@ -188,7 +186,7 @@ async def analyze_photo_directly(message: Message):
         await message.answer("Ой! Не удалось проанализировать фото. Попробуй еще раз! 😿", reply_markup=photo_received_keyboard)
 
 # ----------------- Обработка кнопки "Оценить другого котика" -----------------
-@router.message(F.text == "Оценить другого котика")  # ← router вместо dp
+@router.message(F.text == "Оценить другого котика")
 async def rate_another_cat_handler(message: Message):
     """Начать оценку другого котика"""
     user_id = message.from_user.id
@@ -219,9 +217,10 @@ async def rate_another_cat_handler(message: Message):
     )
 
 # ----------------- Обработка кнопки "Вернуться в меню" -----------------
-@router.message(F.text == "Вернуться в меню")  # ← router вместо dp
+@router.message(F.text == "Вернуться в меню")
 async def back_to_menu_directly(message: Message):
     """Возврат в главное меню"""
+    logger.info(f"🟣 Обработчик 'Вернуться в меню' сработал для пользователя {message.from_user.id}")
     user_id = message.from_user.id
     if user_id in user_last_photos:
         del user_last_photos[user_id]
@@ -230,16 +229,17 @@ async def back_to_menu_directly(message: Message):
     await message.answer("Выбери действие:", reply_markup=MAIN_MENU_KEYBOARD)
 
 # ----------------- Обработка обычного текста -----------------
-@router.message()  
+@router.message(F.text & ~F.text.startswith('/'))
 async def handle_user_request(message: Message):
     """Обработка случайного текста - не списываем запросы"""
-    if message.text and not message.text.startswith('/'):
-        responses = [
-            "Я специализируюсь на качественной оценке котиков. Пришлите фото котика для анализа",
-            "Предлагаю перейти к пушишам. Пришлите фото котика для анализа", 
-            "Могу дать комментарии по мяучке. Пришлите фото котика для анализа",
-            "Ожидаю загрузки котейшества. Пришлите фото котика для анализа",
-            "Котикам время а перепискам час. Пришлите фото котика для анализа"
-        ]
-        response = random.choice(responses)
-        await message.answer(response)
+    logger.info(f"🔴 Обработка случайного текста: '{message.text}' от {message.from_user.id}")
+    
+    responses = [
+        "Я специализируюсь на качественной оценке котиков. Пришлите фото котика для анализа",
+        "Предлагаю перейти к пушишам. Пришлите фото котика для анализа", 
+        "Могу дать комментарии по мяучке. Пришлите фото котика для анализа",
+        "Ожидаю загрузки котейшества. Пришлите фото котика для анализа",
+        "Котикам время а перепискам час. Пришлите фото котика для анализа"
+    ]
+    response = random.choice(responses)
+    await message.answer(response)

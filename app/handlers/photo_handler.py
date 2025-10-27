@@ -2,7 +2,7 @@
 from aiogram import types
 from aiogram.dispatcher.router import Router
 from app.bot_instance import bot
-from app.services.cat_analyzer import analyze_cat_image
+#from app.services.cat_analyzer import analyze_cat_image
 import logging
 
 logger = logging.getLogger(__name__)

@@ -1,4 +1,3 @@
-# app/main.py
 import asyncio
 import logging
 import os
@@ -16,16 +15,19 @@ print("✅ Bot instance loaded")
 from app.handlers.payment_handler import payment_router
 from app.handlers.basic import router as basic_router
 from app.handlers.photo_handler import router as photo_router
+from app.handlers.admin_handler import admin_router
 
 # Подключаем роутеры
 dp.include_router(payment_router)
 dp.include_router(basic_router)
 dp.include_router(photo_router)
+dp.include_router(admin_router)
 print("✅ All routers loaded")
 
 from app.db.models import Base
 from app.db.database import engine
 
+# Создаем таблицы
 Base.metadata.create_all(bind=engine)
 
 print(f"Итоговое количество обработчиков в dp: {len(dp.message.handlers)}")

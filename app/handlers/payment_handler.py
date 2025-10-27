@@ -87,10 +87,19 @@ class PromoService:
         ).all()
 
 
+
 @payment_router.message(Command("replenish"))
 async def replenish_balance(message: Message):
     """Показ меню пополнения через Stars"""
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    # ПРИНУДИТЕЛЬНО ПЕРЕЗАГРУЖАЕМ КОНФИГ
+    import importlib
+    from app import config
+    importlib.reload(config)
+    from app.config import RequestConfig, get_pricing_display
+    
+    print(f"🔄 RELOADED PRICING: {RequestConfig.PRICING}")
     
     # Динамически создаем кнопки из конфига
     keyboard = []
@@ -106,6 +115,68 @@ async def replenish_balance(message: Message):
         if len(row) == 2 or i == len(RequestConfig.PRICING.items()) - 1:
             keyboard.append(row)
             row = []
+    
+    reply_markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    await message.answer(
+        f"🎯 **Выберите пакет запросов:**\n\n"
+        f"💫 {get_pricing_display()}\n\n"
+        f"⭐ Stars покупаются прямо в Telegram",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+    
+    # ИСПРАВЛЯЕМ: используем функцию get_pricing_display() вместо статичного текста
+    await message.answer(
+        f"🎯 **Выберите пакет запросов:**\n\n"
+        f"💫 {get_pricing_display()}\n\n"  # ← ДИНАМИЧЕСКИЙ ТЕКСТ!
+        f"⭐ Stars покупаются прямо в Telegram",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+@payment_router.message(Command("prices"))
+async def show_new_prices(message: Message):
+    """Новая команда для проверки цен"""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    keyboard = []
+    row = []
+    
+    for i, (stars, requests) in enumerate(RequestConfig.PRICING.items()):
+        button = InlineKeyboardButton(
+            text=f"{stars} ⭐ - {requests} запросов", 
+            callback_data=f"buy_{stars}"
+        )
+        row.append(button)
+        
+        if len(row) == 2 or i == len(RequestConfig.PRICING.items()) - 1:
+            keyboard.append(row)
+            row = []
+    
+    reply_markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    await message.answer(
+        f"🆕 **НОВЫЕ ЦЕНЫ:**\n\n"
+        f"💫 {get_pricing_display()}\n\n"  # ← ДИНАМИЧЕСКИЙ ТЕКСТ!
+        f"⭐ Stars покупаются прямо в Telegram",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+    
+    # Добавляем кнопку промокода
+    keyboard.append([InlineKeyboardButton(text="🎁 Ввести промокод", callback_data="enter_promo")])
+    
+    reply_markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    
+    await message.answer(
+        f"💫 **Доступные тарифы:**\n{get_pricing_display()}\n\n"
+        f"{get_free_requests_info()}\n"
+        f"{get_promo_info()}\n\n"
+        f"Выберите вариант пополнения:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
     
     # Добавляем кнопку промокода
     keyboard.append([InlineKeyboardButton(text="🎁 Ввести промокод", callback_data="enter_promo")])
